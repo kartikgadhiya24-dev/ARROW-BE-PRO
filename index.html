@@ -530,8 +530,10 @@ function handleCanvasClick(e){
 // True Arrow Go rule: the ENTIRE straight path to the board edge must be clear.
 function canArrowEscape(col,row,arrow){
   if(!arrow||arrow==='ANIMAL') return false;
+  // Escape direction always starts from the arrowhead, regardless of which segment was tapped.
+  const head=arrow.head||{c:col,r:row};
   const [dc,dr]=DIR_VECS[arrow.dir];
-  let c=col+dc, r=row+dr;
+  let c=head.c+dc, r=head.r+dr;
   while(c>=0&&c<gridSize&&r>=0&&r<gridSize){
     // Any arrow or the rescued character blocks the path.
     if(grid[r][c]!==null) return false;
