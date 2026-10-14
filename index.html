@@ -342,11 +342,28 @@ function startLevel(idx){
 
   // Build empty grid
   grid=Array.from({length:gridSize},()=>Array(gridSize).fill(null));
-  // No central animal/duck: the puzzle is only arrows and clean grid tiles.
-  lv.arrows.forEach(([c,r,d])=>{
-    grid[r][c]={dir:d,id:`${c}_${r}`};
+  // Build linked polyline arrows: reserve heads first, then attach bent tails.
+  const arrowObjects=lv.arrows.map(([col,row,d])=>({dir:d,id:col+'_'+row,head:{c:col,r:row},path:[{c:col,r:row}]}));
+  arrowObjects.forEach(a=>{grid[a.head.r][a.head.c]=a;});
+  const occupied=(col,row)=>col<0||col>=gridSize||row<0||row>=gridSize||grid[row][col]!==null;
+  arrowObjects.forEach(a=>{
+    const [dc,dr]=DIR_VECS[a.dir], back={c:-dc,r:-dr};
+    const bends=(dc===0||dr===0)?[{c:dr,r:-dc},{c:-dr,r:dc}]:[{c:back.c,r:0},{c:0,r:back.r},{c:dr,r:-dc},{c:-dr,r:dc}];
+    for(const bend of bends){
+      let col=a.head.c+back.c,row=a.head.r+back.r;
+      if(occupied(col,row)) continue;
+      const trial=[{...a.head},{c:col,r:row}];
+      col+=bend.c;row+=bend.r;
+      if(occupied(col,row)) continue;
+      trial.push({c:col,r:row});
+      const ec=col+back.c,er=row+back.r;
+      if(!occupied(ec,er)) trial.push({c:ec,r:er});
+      a.path=trial;
+      for(const p of a.path.slice(1)) grid[p.r][p.c]=a;
+      break;
+    }
   });
-  totalArrows=lv.arrows.length;
+  totalArrows=arrowObjects.length;
 
   document.getElementById('g-level-badge').textContent='Level '+(idx+1);
   document.getElementById('hint-count').textContent=hintsLeft;
@@ -398,20 +415,12 @@ function drawBoard(){
   }
 
   // Cells
-  const cx=Math.floor(gridSize/2), cy=Math.floor(gridSize/2);
+  const drawn=new Set();
   for(let r=0;r<gridSize;r++){
     for(let c=0;c<gridSize;c++){
-      const x=c*cell, y=r*cell;
-      const cell_=grid[r][c];
-
-      if(cell_&&cell_!=='ANIMAL'){
-        drawArrowCell(ctx,x,y,cell,cell_.dir,cell_.id);
-      } else {
-        // Clean empty tile: no animal or mascot in the center.
-        ctx.globalAlpha=0.72;
-        roundRect(ctx,x+4,y+4,cell-8,cell-8,10,'#f2f4ff');
-        ctx.globalAlpha=1;
-      }
+      const x=c*cell,y=r*cell,cell_=grid[r][c];
+      if(cell_){if(!drawn.has(cell_.id)){drawArrowPath(cell_,cell);drawn.add(cell_.id);}}
+      else{ctx.globalAlpha=0.72;roundRect(ctx,x+4,y+4,cell-8,cell-8,10,'#f2f4ff');ctx.globalAlpha=1;}
     }
   }
 }
@@ -477,6 +486,18 @@ function drawArrowCell(ctx,x,y,cell,dir,id){
   ctx.globalAlpha=1;
 }
 
+function drawArrowPath(arrow,cellSize){
+  const cell=cellSize,pts=arrow.path.map(p=>({x:p.c*cell+cell/2,y:p.r*cell+cell/2}));
+  if(!pts.length)return;
+  ctx.save();ctx.globalAlpha=animatingIds.has(arrow.id)?0.42:1;
+  const color=ARROW_COLORS[arrow.dir];ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.lineWidth=Math.max(3,cell*0.095);ctx.shadowColor=color;ctx.shadowBlur=4;
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();ctx.shadowBlur=0;
+  const tail=pts[pts.length-1];ctx.beginPath();ctx.arc(tail.x,tail.y,Math.max(2,cell*0.045),0,Math.PI*2);ctx.fill();
+  const v=DIR_VECS[arrow.dir],tip=pts[0],len=cell*0.23,wing=cell*0.15,bx=tip.x-v[0]*len,by=tip.y-v[1]*len;
+  ctx.lineWidth=Math.max(2.5,cell*0.075);ctx.beginPath();ctx.moveTo(bx-v[1]*wing,by+v[0]*wing);ctx.lineTo(tip.x,tip.y);ctx.lineTo(bx+v[1]*wing,by-v[0]*wing);ctx.stroke();ctx.restore();
+}
+
 // ════════════════════════════════════════════════════════════
 // INPUT
 // ════════════════════════════════════════════════════════════
@@ -537,7 +558,7 @@ function launchArrow(col,row,dir){
   isProcessing=true;
   const arrowObj=grid[row][col];
   animatingIds.add(arrowObj.id);
-  grid[row][col]=null;
+  arrowObj.path.forEach(p=>{if(grid[p.r][p.c]===arrowObj)grid[p.r][p.c]=null;});
   clearedCount++;
   movesUsed++;
 
@@ -557,13 +578,8 @@ function flyAnimation(col,row,dir,cb){
   const x=rect.left+col*cell+cell/2;
   const y=rect.top+row*cell+cell/2;
 
-  const el=document.createElement('div');
-  el.className='flying-arrow';
-  el.textContent=DIR_ARROWS[dir];
-  el.style.left=(x-16)+'px';
-  el.style.top=(y-16)+'px';
-  el.style.color=ARROW_COLORS[dir];
-  document.body.appendChild(el);
+  const el=document.createElement('div');el.className='flying-arrow';el.textContent=DIR_ARROWS[dir];el.style.left=(x-16)+'px';el.style.top=(y-16)+'px';el.style.color=ARROW_COLORS[dir];document.body.appendChild(el);
+  const vec=DIR_VECS[dir];el.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:'translate('+(vec[0]*window.innerWidth)+'px,'+(vec[1]*window.innerHeight)+'px) scale(.35)',opacity:0}],{duration:380,easing:'ease-in',fill:'forwards'});
   setTimeout(()=>{el.remove();cb();},380);
 }
 
