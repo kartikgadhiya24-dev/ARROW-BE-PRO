@@ -131,7 +131,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);font-famil
 
 <!-- ════════════════════════════════ HOME ════════════════════════════════ -->
 <div id="home-screen" class="screen">
-  <div class="home-animal" id="home-anim">🐣</div>
+  <div class="home-animal" id="home-anim">➤</div>
   <div class="home-logo">Arrow<span>GO</span></div>
   <div class="home-tagline">Free the animal. Clear the grid!</div>
   <button class="btn btn-play" onclick="showLevelSelect()">▶ PLAY</button>
@@ -182,7 +182,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);font-famil
 <div id="win-overlay">
   <div class="confetti-wrap" id="confetti-wrap"></div>
   <div class="win-card">
-    <div class="win-animal" id="win-animal">🐣</div>
+    <div class="win-animal" id="win-animal">✨</div>
     <div class="win-title">You Win! 🎉</div>
     <div class="win-sub" id="win-sub">Animal is free!</div>
     <div class="win-stars-row">
@@ -342,11 +342,9 @@ function startLevel(idx){
 
   // Build empty grid
   grid=Array.from({length:gridSize},()=>Array(gridSize).fill(null));
-  const cx=Math.floor(gridSize/2), cy=Math.floor(gridSize/2);
-  grid[cy][cx]='ANIMAL';
-
+  // No central animal/duck: the puzzle is only arrows and clean grid tiles.
   lv.arrows.forEach(([c,r,d])=>{
-    if(grid[r][c]!=='ANIMAL') grid[r][c]={dir:d,id:`${c}_${r}`};
+    grid[r][c]={dir:d,id:`${c}_${r}`};
   });
   totalArrows=lv.arrows.length;
 
@@ -406,15 +404,12 @@ function drawBoard(){
       const x=c*cell, y=r*cell;
       const cell_=grid[r][c];
 
-      if(r===cy&&c===cx){
-        // Animal cell
-        drawAnimalCell(x,y,cell);
-      } else if(cell_&&cell_!=='ANIMAL'){
+      if(cell_&&cell_!=='ANIMAL'){
         drawArrowCell(ctx,x,y,cell,cell_.dir,cell_.id);
       } else {
-        // Empty cell
-        ctx.globalAlpha=0.5;
-        roundRect(ctx,x+4,y+4,cell-8,cell-8,12,'#f0f2ff');
+        // Clean empty tile: no animal or mascot in the center.
+        ctx.globalAlpha=0.72;
+        roundRect(ctx,x+4,y+4,cell-8,cell-8,10,'#f2f4ff');
         ctx.globalAlpha=1;
       }
     }
@@ -466,13 +461,19 @@ function drawArrowCell(ctx,x,y,cell,dir,id){
     ctx.globalAlpha=0.4;
   }
 
-  // Arrow symbol
+  // Crisp directional line and arrowhead instead of a large emoji glyph.
   const cx_=x+cell/2, cy_=y+cell/2;
-  ctx.fillStyle=ARROW_COLORS[dir];
-  ctx.font=`bold ${cell*0.38}px Nunito, sans-serif`;
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(DIR_ARROWS[dir],cx_,cy_);
-
+  const vec=DIR_VECS[dir], ux=vec[0], uy=vec[1];
+  const len=cell*0.27, head=cell*0.13;
+  const sx=cx_-ux*len*0.72, sy=cy_-uy*len*0.72;
+  const ex=cx_+ux*len*0.72, ey=cy_+uy*len*0.72;
+  ctx.strokeStyle=ARROW_COLORS[dir]; ctx.fillStyle=ARROW_COLORS[dir];
+  ctx.lineWidth=Math.max(2.5,cell*0.075); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-ux*head-uy*head*0.75,ey-uy*head+ux*head*0.75);
+  ctx.lineTo(ex-ux*head+uy*head*0.75,ey-uy*head-ux*head*0.75);
+  ctx.closePath(); ctx.fill();
   ctx.globalAlpha=1;
 }
 
@@ -629,8 +630,8 @@ function showWin(){
   if(currentLevel+1<LEVELS.length) progress[currentLevel+1]={...( progress[currentLevel+1]||{}),unlocked:true};
   localStorage.setItem('arrowGOProgress',JSON.stringify(progress));
 
-  document.getElementById('win-animal').textContent=ANIMALS[currentLevel%ANIMALS.length];
-  document.getElementById('win-sub').textContent=stars===3?'Perfect! No wasted moves!':stars===2?'Great job!':'Level cleared!';
+  document.getElementById('win-animal').textContent='✨';
+  document.getElementById('win-sub').textContent=stars===3?'Perfect! Clean clear!':stars===2?'Great job!':'Board cleared!';
   const ws=['ws1','ws2','ws3'];
   ws.forEach(id=>document.getElementById(id).style.cssText='transform:scale(0)');
   document.getElementById('win-overlay').classList.add('show');
@@ -743,7 +744,7 @@ function roundRectStroke(ctx,x,y,w,h,r){
 }
 
 // Home animal cycle
-const homeAnimals=['🐣','🐰','🦊','🐸','🐼'];
+const homeAnimals=['➤','↗','➜','↘','➤'];
 let hai=0;
 setInterval(()=>{
   hai=(hai+1)%homeAnimals.length;
