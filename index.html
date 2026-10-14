@@ -159,6 +159,7 @@ html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);font-famil
     <div class="g-level-badge" id="g-level-badge">Level 1</div>
     <div style="display:flex;gap:8px;align-items:center;">
       <div class="g-moves"><span class="g-moves-icon">🎯</span><span id="g-arrows-left">0 left</span></div>
+      <div class="g-moves" aria-label="Lives remaining"><span id="g-lives" aria-live="polite">❤️❤️❤️</span></div>
       <div style="position:relative;">
         <button class="hint-btn" onclick="useHint()">💡</button>
         <div class="hint-count" id="hint-count">3</div>
@@ -292,6 +293,7 @@ let clearedCount = 0;
 let totalArrows = 0;
 let movesUsed = 0;
 let moveLimit = 0;
+let livesLeft = 3;
 let animatingIds = new Set();
 let isProcessing = false;
 
@@ -334,6 +336,7 @@ function startLevel(idx){
   movesUsed=0;
   clearedCount=0;
   hintsLeft=3;
+  livesLeft=3;
   isProcessing=false;
   animatingIds.clear();
 
@@ -521,6 +524,9 @@ function tryLaunch(col,row){
   if(!arrow||arrow==='ANIMAL') return;
   if(!canArrowEscape(col,row,arrow)){
     shakeCell(col,row);
+    livesLeft=Math.max(0,livesLeft-1);
+    updateHUD();
+    if(livesLeft===0) setTimeout(()=>showFail(),220);
     return;
   }
   launchArrow(col,row,arrow.dir);
@@ -577,6 +583,7 @@ function updateHUD(){
   const pct=totalArrows>0?(clearedCount/totalArrows*100):0;
   document.getElementById('progress-fill').style.width=pct+'%';
   document.getElementById('hint-count').textContent=hintsLeft;
+  document.getElementById('g-lives').textContent='❤️'.repeat(livesLeft)+'🖤'.repeat(3-livesLeft);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -639,7 +646,7 @@ function showWin(){
 }
 
 function showFail(){
-  document.getElementById('fail-sub').textContent='No valid moves left. Try again!';
+  document.getElementById('fail-sub').textContent=livesLeft===0?'You ran out of hearts. Try again!':'No valid moves left. Try again!';
   document.getElementById('fail-overlay').classList.add('show');
 }
 
