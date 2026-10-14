@@ -502,18 +502,27 @@ function handleCanvasClick(e){
   tryLaunch(col,row);
 }
 
+// True Arrow Go rule: the ENTIRE straight path to the board edge must be clear.
+function canArrowEscape(col,row,arrow){
+  if(!arrow||arrow==='ANIMAL') return false;
+  const [dc,dr]=DIR_VECS[arrow.dir];
+  let c=col+dc, r=row+dr;
+  while(c>=0&&c<gridSize&&r>=0&&r<gridSize){
+    // Any arrow or the rescued character blocks the path.
+    if(grid[r][c]!==null) return false;
+    c+=dc;
+    r+=dr;
+  }
+  return true;
+}
+
 function tryLaunch(col,row){
   const arrow=grid[row][col];
   if(!arrow||arrow==='ANIMAL') return;
-  const [dc,dr]=DIR_VECS[arrow.dir];
-  // Check path: next cell must be empty or off-grid
-  const nc=col+dc, nr=row+dr;
-  if(nc>=0&&nc<gridSize&&nr>=0&&nr<gridSize&&grid[nr][nc]!==null){
-    // Blocked
+  if(!canArrowEscape(col,row,arrow)){
     shakeCell(col,row);
     return;
   }
-  // Launch!
   launchArrow(col,row,arrow.dir);
 }
 
@@ -587,9 +596,7 @@ function checkDeadlock(){
     for(let c=0;c<gridSize;c++){
       const a=grid[r][c];
       if(!a||a==='ANIMAL') continue;
-      const [dc,dr]=DIR_VECS[a.dir];
-      const nc=c+dc, nr=r+dr;
-      if(nc<0||nc>=gridSize||nr<0||nr>=gridSize||grid[nr][nc]===null){
+      if(canArrowEscape(c,r,a)){
         canMove=true; break;
       }
     }
@@ -658,9 +665,7 @@ function useHint(){
     for(let c=0;c<gridSize;c++){
       const a=grid[r][c];
       if(!a||a==='ANIMAL') continue;
-      const [dc,dr]=DIR_VECS[a.dir];
-      const nc=c+dc, nr=r+dr;
-      if(nc<0||nc>=gridSize||nr<0||nr>=gridSize||grid[nr][nc]===null){
+      if(canArrowEscape(c,r,a)){
         hintsLeft--;
         updateHUD();
         // Highlight then launch
